@@ -1,0 +1,22 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: no
+  environment: "{{ environment_vars }}"
+  roles:
+    - role: zos_ims_arc_deletion
+      arc:
+        bcs_ssid: "{{ hostvars[affected_host]['arc_bcs_ssid'] }}"
+        bcs_ssid_sysaff: "{{ hostvars[affected_host]['arc_bcs_ssid_sysaff'] }}"
+        deletion_type: "{{ hostvars[affected_host]['arc_deletion_type'] }}"
+        load_library: "{{ hostvars[affected_host]['arc_load_library'] }}"
+      records:
+        - "XXXXXXXX XXXXXXXX G        XXXXXXXX XXXXXXXX WED 05/12/2010 13:38 ABENDED"
+      zosmf:
+        ansible_inventory_hostname: "{{ affected_host }}"
+        console_name: "{{ hostvars[affected_host]['zosmf_console_name'] }}"
+        uri_username: "{{ uri_username }}"
+        uri_password: "{{ uri_password }}"
+        url: "{{ hostvars[affected_host]['zosmf_url'] }}"
+        use_api: true
+        use_mfa: "{{ hostvars[affected_host]['use_mfa'] }}"

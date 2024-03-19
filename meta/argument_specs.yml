@@ -1,0 +1,76 @@
+---
+argument_specs:
+  main:
+    short_description: Main set of tasks of the role zos_ims_arc_deletion.
+    author: Luiggi Torricelli
+    options:
+      arc:
+        description: "A dict containing ARC-related information."
+        type: "dict"
+        required: true
+        options:
+          bcs_ssid:
+            description: "A string containing the BCS subsystem ID."
+            type: "str"
+            required: true
+          bcs_ssid_sysaff:
+            description: "A string containing the SYSAFF where BCS subsystem ID is running."
+            type: "str"
+            required: true
+          deletion_type:
+            description: "A string containing the deletion type of the transaction input records."
+            type: "str"
+            required: true
+            choices:
+              - "ALL"
+              - "ORPHAN"
+          load_library:
+            description: "A string containing the AR/CNTL load library containing the AESURDRE JCL program."
+            type: "str"
+            required: true
+      mode:
+        description: "A string identifying if the job that effectively tries to delete the record(s) should run or not."
+        type: "str"
+        default: "RUN"
+        required: false
+        choices:
+          - "RUN"
+          - "TEST"
+      records:
+        description: "A list of strings containing ARC records to be processed."
+        type: "list"
+        elements: "str"
+        required: true
+      zosmf:
+        description: "A dict containing z/OSMF-related information."
+        type: "dict"
+        required: true
+        options:
+          ansible_inventory_hostname:
+            description: "A string to identify the Ansible inventory hostname to pull existing variables from."
+            type: "str"
+            required: true
+          console_name:
+            description: "A string to identify the console name to be used with z/OSMF Console Services API."
+            type: "str"
+            required: true
+          uri_username:
+            description: "A string to identify the z/OSMF user ID of the remote system."
+            type: "str"
+            required: true
+          uri_password:
+            description: "A string to identify the z/OSMF user's password of the remote system."
+            type: "str"
+            required: true
+          url:
+            description: "A string to identify the z/OSMF URL of the system."
+            type: "str"
+            required: true
+          use_api:
+            description: "A boolean to determine if z/OSMF REST API should be used instead of ibm.ibm_zos_core collection."
+            type: "bool"
+            required: true
+          use_mfa:
+            description: "A boolean to determine if MFA should be used to connect on the z/OS LPAR."
+            type: "bool"
+            required: true

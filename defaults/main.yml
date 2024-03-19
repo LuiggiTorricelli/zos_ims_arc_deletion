@@ -1,0 +1,2 @@
+# Identifies if it the job that effectively tries to delete the record(s) should run or not.
+mode: "RUN"

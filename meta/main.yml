@@ -1,0 +1,19 @@
+galaxy_info:
+  author:
+    - Fernando Alfredo Custodio
+    - Luiggi Torricelli
+  description: Perform ARC deletion on IMS subsystems running on z/OS.
+  license: Apache-2.0
+  min_ansible_version: 2.15
+  galaxy_tags:
+    - ims
+    - zos
+    - mainframe
+    - arc
+    - deletion
+    - middleware
+    - database
+    - delete
+collections:
+  - ibm.ibm_zos_core
+dependencies: []

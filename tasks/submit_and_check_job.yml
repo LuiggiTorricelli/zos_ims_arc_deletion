@@ -1,0 +1,85 @@
+- name: "Block to control the submission of the IMS ARC deletion job."
+  block:
+    - name: "Set fact containing the messages to be searched on the outputs to indicate failure or success."
+      ansible.builtin.set_fact:
+        zos_ims_arc_deletion_failure_msg: "NO AR/CTL RESTART CONTROL RECORDS MET CRITERIA"
+        zos_ims_arc_deletion_success_msg: "AR/CTL RESTART CONTROL RECORDS ERASED:"
+
+    - name: "Calling the z/OSMF Jobs API, submit the job {{ __jobname_jobcard }}."
+      ansible.builtin.uri:
+        url: "{{ zosmf.url }}/zosmf/restjobs/jobs"
+        method: "PUT"
+        body: "{{ lookup('template', role_path + '/templates/job_model.j2') }}"
+        body_format: "raw"
+        status_code: [201]
+        validate_certs: false
+        headers:
+          Accept: "application/json"
+          Content-Type: "text/plain"
+          Cookie: "{{ zos_ims_arc_deletion_zosmf_authenticate_out.cookies_string }}"
+      register: zos_ims_arc_deletion_zosmf_jobs_submit_out
+      changed_when: zos_ims_arc_deletion_zosmf_jobs_submit_out.status == 201
+
+    - name: "Calling the z/OSMF Jobs API, check job {{ __jobname_jobcard }} until it is marked as completed."
+      ansible.builtin.uri:
+        url: "{{ zosmf.url }}/zosmf/restjobs/jobs/{{ zos_ims_arc_deletion_zosmf_jobs_submit_out.json.jobname }}/{{ zos_ims_arc_deletion_zosmf_jobs_submit_out.json.jobid }}"
+        method: "GET"
+        status_code: [200]
+        validate_certs: false
+        headers:
+          Accept: "application/json"
+          Cookie: "{{ zos_ims_arc_deletion_zosmf_authenticate_out.cookies_string }}"
+      register: zos_ims_arc_deletion_zosmf_jobs_status_out
+      failed_when: (zos_ims_arc_deletion_zosmf_jobs_status_out.json.retcode | regex_findall('(SYS FAIL|ABENDU|ABEND S|CANCELED|CONV ABEND|CONV ERROR|JCL ERROR|SEC ERROR|SYS FAIL)') | list | length > 0) or ((zos_ims_arc_deletion_zosmf_jobs_status_out.json.retcode | regex_replace('CC +(\\S+)', '\\1') | int) > (__max_rc | int))
+      retries: "{{ (((__wait_time_m | int) * (60 / 5)) - 1) | int }}"
+      delay: 5
+      until: zos_ims_arc_deletion_zosmf_jobs_status_out.json.retcode != None
+
+    - name: "Calling the z/OSMF Jobs API, get list of spool files from job {{ __jobname_jobcard }}."
+      ansible.builtin.uri:
+        url: "{{ zosmf.url }}/zosmf/restjobs/jobs/{{ zos_ims_arc_deletion_zosmf_jobs_submit_out.json.jobname }}/{{ zos_ims_arc_deletion_zosmf_jobs_submit_out.json.jobid }}/files"
+        method: "GET"
+        status_code: [200]
+        validate_certs: false
+        headers:
+          Accept: "application/json"
+          Cookie: "{{ zos_ims_arc_deletion_zosmf_authenticate_out.cookies_string }}"
+      register: zos_ims_arc_deletion_zosmf_jobs_files_out
+      failed_when: zos_ims_arc_deletion_zosmf_jobs_files_out.json | selectattr('ddname', 'eq', 'TRANSRPT') | list | length == 0
+
+    - name: "Calling the z/OSMF Jobs API, get contents of the TRANSRPT DD from job {{ __jobname_jobcard }}."
+      ansible.builtin.uri:
+        url: "{{ zosmf.url }}/zosmf/restjobs/jobs/{{ zos_ims_arc_deletion_zosmf_jobs_submit_out.json.jobname }}/{{ zos_ims_arc_deletion_zosmf_jobs_submit_out.json.jobid }}/files/{{ __dd_id }}/records?mode=text&search={{ __msg_to_search }}&maxreturnsize=1"
+        method: "GET"
+        body_format: "raw"
+        return_content: true
+        status_code: [200]
+        validate_certs: false
+        headers:
+          Accept: "text/plain"
+          Cookie: "{{ zos_ims_arc_deletion_zosmf_authenticate_out.cookies_string }}"
+      register: zos_ims_arc_deletion_zosmf_jobs_records_out
+      vars:
+        __dd_id: "{{ (zos_ims_arc_deletion_zosmf_jobs_files_out.json | selectattr('ddname', 'eq', 'TRANSRPT') | list | first).id }}"
+        __msg_to_search: "{{ (__arc_runtype == 'SIMULATE') | ternary(zos_ims_arc_deletion_failure_msg, zos_ims_arc_deletion_success_msg) | replace(' ', '%20') | replace('/', '%2F') | replace(':', '%3A') }}"
+
+    - name: "Assert that the contents of the read TRANSRPT are empty when RUNTYPE=SIMULATE or not when RUNTYPE=DELETE."
+      ansible.builtin.assert:
+        that:
+          - (__arc_runtype == 'SIMULATE' and zos_ims_arc_deletion_zosmf_jobs_records_out.content | length == 0) or __arc_runtype == 'DELETE'
+          - (__arc_runtype == 'DELETE' and zos_ims_arc_deletion_zosmf_jobs_records_out.content | length > 0) or __arc_runtype == 'SIMULATE'
+        fail_msg: 
+          - "ERROR: When informing RUNTYPE={{ __arc_runtype }}, the content of the TRANSRPT DD was {{ (__arc_runtype == 'SIMULATE') | ternary('not empty', 'empty') }}:"
+          - "{{ zos_ims_arc_deletion_zosmf_jobs_records_out.content }}"
+        success_msg:
+          - "SUCCESS: When informing RUNTYPE={{ __arc_runtype }}, the content of the TRANSRPT DD was {{ (__arc_runtype == 'SIMULATE') | ternary('empty', 'not empty') }}:"
+          - "{{ zos_ims_arc_deletion_zosmf_jobs_records_out.content }}"
+        quiet: true
+  rescue:
+    - name: "Set fact containing the step that failed."
+      ansible.builtin.set_fact:
+        zos_ims_arc_deletion_failed_step: "SUBMIT JOB - {{ __arc_runtype }}"
+    
+    - name: "Fail host."
+      ansible.builtin.fail:
+        msg: "ERROR: The role 'zos_ims_arc_deletion' failed at: {{ zos_ims_arc_deletion_failed_step }}"

@@ -1,0 +1,35 @@
+---
+- name: "Include set of tasks to initialize required variables."
+  ansible.builtin.include_tasks:
+    file: "tasks/initialize_vars.yml"
+
+- name: "Include set of tasks to perform the z/OSMF REST API authentication."
+  ansible.builtin.include_tasks:
+    file: "tasks/authenticate.yml"
+
+- name: "Include set of tasks to submit and verify the IMS ARC deletion job with the SIMULATE run type."
+  ansible.builtin.include_tasks:
+    file: "tasks/submit_and_check_job.yml"
+  vars:
+    __jobname_jobcard: "D1TARCDE"
+    __arc_bcs_ssid: "{{ arc.bcs_ssid }}"
+    __arc_bcs_ssid_sysaff: "{{ arc.bcs_ssid_sysaff }}"
+    __arc_deltype: "{{ arc.deletion_type }}"
+    __arc_load_library: "{{ arc.load_library }}"
+    __arc_runtype: "SIMULATE"
+    __max_rc: 0
+    __wait_time_m: 2
+
+- name: "Include set of tasks to submit and verify the IMS ARC deletion job with the DELETE run type."
+  ansible.builtin.include_tasks:
+    file: "tasks/submit_and_check_job.yml"
+  vars:
+    __jobname_jobcard: "D1TARCDE"
+    __arc_bcs_ssid: "{{ arc.bcs_ssid }}"
+    __arc_bcs_ssid_sysaff: "{{ arc.bcs_ssid_sysaff }}"
+    __arc_deltype: "{{ arc.deletion_type }}"
+    __arc_load_library: "{{ arc.load_library }}"
+    __arc_runtype: "DELETE"
+    __max_rc: 0
+    __wait_time_m: 2
+  when: mode in ['RUN']

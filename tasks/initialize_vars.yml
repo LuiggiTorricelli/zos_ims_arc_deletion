@@ -1,0 +1,57 @@
+- name: "Block to control the initialization of variables."
+  block:
+    - name: "Assert that informed variables are correct."
+      ansible.builtin.assert:
+        that:
+          - arc.bcs_ssid is string and arc.bcs_ssid is iterable and arc.bcs_ssid is sequence and arc.bcs_ssid is not mapping
+          - arc.bcs_ssid_sysaff is string and arc.bcs_ssid_sysaff is iterable and arc.bcs_ssid_sysaff is sequence and arc.bcs_ssid_sysaff is not mapping
+          - arc.deletion_type is string and arc.deletion_type is iterable and arc.deletion_type is sequence and arc.deletion_type is not mapping
+          - arc.load_library is string and arc.load_library is iterable and arc.load_library is sequence and arc.load_library is not mapping
+          - (records is not mapping) and (records is iterable) and (records is not string) and (records | length > 0)
+        fail_msg: "ERROR: The ARC variables were wrongly informed."
+        success_msg: "SUCCESS: The ARC variables were correctly informed."
+        quiet: true
+
+    - name: "Assert that informed z/OSMF values are correct."
+      ansible.builtin.assert:
+        that:
+          - zosmf.use_api in [True, False]
+          - zosmf.use_mfa in [True, False]
+          - zosmf.ansible_inventory_hostname is string and zosmf.ansible_inventory_hostname is iterable and zosmf.ansible_inventory_hostname is sequence and zosmf.ansible_inventory_hostname is not mapping
+          - zosmf.console_name is string and zosmf.console_name is iterable and zosmf.console_name is sequence and zosmf.console_name is not mapping
+          - zosmf.uri_username is string and zosmf.uri_username is iterable and zosmf.uri_username is sequence and zosmf.uri_username is not mapping
+          - zosmf.uri_password is string and zosmf.uri_password is iterable and zosmf.uri_password is sequence and zosmf.uri_password is not mapping
+          - zosmf.url is string and zosmf.url is iterable and zosmf.url is sequence and zosmf.url is not mapping
+          - (zosmf.use_api and zosmf.ansible_inventory_hostname | length > 0 and zosmf.ansible_inventory_hostname == zosmf.ansible_inventory_hostname | trim and hostvars[zosmf.ansible_inventory_hostname] is defined) or not zosmf.use_api
+          - (zosmf.use_api and zosmf.console_name | length > 0 and zosmf.console_name | length <= 8 and zosmf.console_name == zosmf.console_name | trim) or not zosmf.use_api
+          - (zosmf.use_api and zosmf.uri_username | length > 0 and zosmf.uri_username | length <= 8 and zosmf.uri_username == zosmf.uri_username | trim) or not zosmf.use_api
+          - (zosmf.use_api and zosmf.uri_password | length > 0) or not zosmf.use_api
+          - (zosmf.use_api and zosmf.url | length > 0 and zosmf.url == zosmf.url | trim and zosmf.url[-1] != '/') or not zosmf.use_api
+        fail_msg: "ERROR: The z/OSMF information was incorrectly informed: {{ zosmf | combine({ 'uri_password': 'VALUE_SPECIFIED_IN_NO_LOG_PARAMETER' }) | string }}."
+        success_msg: "SUCCESS: The z/OSMF information was correctly informed: {{ zosmf | combine({ 'uri_password': 'VALUE_SPECIFIED_IN_NO_LOG_PARAMETER' }) | string }}."
+        quiet: true
+
+    - name: "Set fact to parse values from each ARC record and transform it."
+      ansible.builtin.set_fact:
+        zos_ims_arc_deletion_parsed_arc_records: "{{ records | map('regex_findall', '^(.{8}) (.{8}) (.{8}) (.{8}) (.{8}) .{3} (\\d{2}\\/\\d{2}\\/\\d{4}) (\\d{2}:\\d{2}) +.+$') | flatten(levels=1) | list }}"
+
+    - name: "Assert that every ARC record is compound by values of correct length."
+      ansible.builtin.assert:
+        that:
+          - records | length == zos_ims_arc_deletion_parsed_arc_records | length
+          - (__values_per_record | unique | list | length == 1) and (__values_per_record | unique | list | first == 7)
+          - (__lengths_per_value_per_record | unique | list | length == 1) and (__lengths_per_value_per_record | unique | list | first == [8, 8, 8, 8, 8, 10, 5])
+        fail_msg: "ERROR: One or more informed ARC records does not meet the pattern required."
+        success_msg: "SUCCESS: All ARC records were correctly informed."
+        quiet: true
+      vars:
+        __values_per_record: "{{ zos_ims_arc_deletion_parsed_arc_records | map('length') | list }}"
+        __lengths_per_value_per_record: "{{ zos_ims_arc_deletion_parsed_arc_records | map('map', 'length') | map('list') | list }}"
+  rescue:
+    - name: "Set fact containing the step that failed."
+      ansible.builtin.set_fact:
+        zos_ims_arc_deletion_failed_step: "VARIABLE INITIALIZATION"
+    
+    - name: "Fail host."
+      ansible.builtin.fail:
+        msg: "ERROR: The role 'zos_ims_arc_deletion' failed at: {{ zos_ims_arc_deletion_failed_step }}"

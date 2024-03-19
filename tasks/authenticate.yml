@@ -1,0 +1,23 @@
+- name: "Block to control the z/OSMF authentication."
+  block:
+    - name: "If using the z/OSMF REST API, authenticate to get a LTPA token."
+      ansible.builtin.uri:
+        url: "{{ zosmf.url }}/zosmf/services/authenticate"
+        method: "POST"
+        url_username: "{{ zosmf.uri_username }}"
+        url_password: "{{ (zosmf.use_mfa) | ternary('push:', '') }}{{ zosmf.uri_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        headers:
+          Content-Type: "application/json"
+          X-CSRF-ZOSMF-HEADER: ""
+      register: zos_ims_arc_deletion_zosmf_authenticate_out
+      when: zosmf.use_api
+  rescue:
+    - name: "Set fact containing the step that failed."
+      ansible.builtin.set_fact:
+        zos_ims_arc_deletion_failed_step: "Z/OSMF AUTHENTICATION"
+    
+    - name: "Fail host."
+      ansible.builtin.fail:
+        msg: "ERROR: The role 'zos_ims_arc_deletion' failed at: {{ zos_ims_arc_deletion_failed_step }}"
