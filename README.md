@@ -36,4 +36,4 @@ This role is licensed under licensed under [Apache License, Version 2.0](http://
 Author Information
 ==================
 
-This role was created in 2024 by Luiggi Torricelli, a Db2 for z/OS system programmer.
+This role was created in 2024 by Luiggi Torricelli and Fernando Alfredo Custodio.
